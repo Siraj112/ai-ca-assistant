@@ -688,7 +688,7 @@
 
 <script>
   // ================================================================
-  // AI-CA Assistant — Phase 2: File Upload & Parsing Logic
+  // AI-CA Assistant — Phase 2 & 3: File Upload, Parsing & Cleaning
   // ================================================================
   
   const fileInput = document.getElementById('file-input');
@@ -704,17 +704,66 @@
     // 2. PapaParse library se file read karo
     Papa.parse(file, {
       header: true, 
-      skipEmptyLines: 'greedy', 
+      skipEmptyLines: false, // Hum khud empty rows handle karenge
       complete: function(results) {
-        console.log("File Read Success! Data:", results.data);
-        alert("File successfully read! Total rows: " + results.data.length);
-        document.body.dataset.view = 'upload'; // Abhi ke liye wapas bhej do
+        
+        // Asli Data mil gaya
+        let rawData = results.data;
+        let totalRows = rawData.length;
+        
+        let cleanedData = [];
+        let seenRows = new Set();
+        let duplicatesRemoved = 0;
+        let emptyRowsRemoved = 0;
+
+        // 3. DATA CLEANING LOGIC (Khaali aur Duplicate rows hatana)
+        rawData.forEach(function(row) {
+          // Check karo row khaali hai ya nahi
+          let rowValues = Object.values(row);
+          let isEmpty = rowValues.every(val => val === null || val === undefined || val.toString().trim() === '');
+          
+          if (isEmpty) {
+            emptyRowsRemoved++;
+            return; // Khaali row ko skip karo
+          }
+
+          // Check karo duplicate hai ya nahi
+          let rowString = JSON.stringify(row);
+          if (seenRows.has(rowString)) {
+            duplicatesRemoved++;
+            return; // Duplicate ko skip karo
+          }
+
+          // Agar sahi row hai, toh add karo
+          seenRows.add(rowString);
+          cleanedData.push(row);
+        });
+
+        // 4. UI Update karo (Summary Cards me numbers daalo)
+        document.getElementById('stat-total').textContent = totalRows;
+        document.getElementById('stat-duplicates').textContent = duplicatesRemoved;
+        document.getElementById('stat-empty').textContent = emptyRowsRemoved;
+        document.getElementById('stat-cleaned').textContent = cleanedData.length;
+        document.getElementById('filename-badge').textContent = file.name;
+
+        // 5. Result Screen par jao
+        document.body.dataset.view = 'results';
+        
+        console.log("Cleaning Done!", {
+          totalRows, duplicatesRemoved, emptyRowsRemoved, cleanedRows: cleanedData.length
+        });
       },
       error: function(err) {
         alert("Error reading file: " + err.message);
         document.body.dataset.view = 'upload';
       }
     });
+  });
+
+  // "Clean Another" button ka logic (Wapas home screen pe jane ke liye)
+  document.getElementById('clean-another-btn').addEventListener('click', function() {
+    fileInput.value = ''; // Input clear karo
+    document.body.dataset.view = 'upload';
   });
 </script>
 </body>
