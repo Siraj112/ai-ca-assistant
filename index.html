@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="AI-CA Assistant — clean messy client CSVs in seconds. 100% on-device, private, CA-ready." />
   <meta name="theme-color" content="#1E3A8A" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self';">
 
   <title>AI-CA Assistant — Clean Client CSVs in Seconds</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     /* ============ DESIGN TOKENS ============ */
     :root {
@@ -686,12 +686,36 @@
     </div>
   </main>
 
-  <script>
-    // ================================================================
-    // AI-CA Assistant — Phase 1 (UI Shell Only)
-    // ================================================================
-    console.log('[AI-CA] UI shell loaded. Set document.body.dataset.view to preview screens.');
-  </script>
+<script>
+  // ================================================================
+  // AI-CA Assistant — Phase 2: File Upload & Parsing Logic
+  // ================================================================
+  
+  const fileInput = document.getElementById('file-input');
 
+  fileInput.addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // 1. Screen change karo (Upload -> Parsing)
+    document.body.dataset.view = 'parsing';
+    document.getElementById('parsing-filename').textContent = file.name;
+
+    // 2. PapaParse library se file read karo
+    Papa.parse(file, {
+      header: true, 
+      skipEmptyLines: 'greedy', 
+      complete: function(results) {
+        console.log("File Read Success! Data:", results.data);
+        alert("File successfully read! Total rows: " + results.data.length);
+        document.body.dataset.view = 'upload'; // Abhi ke liye wapas bhej do
+      },
+      error: function(err) {
+        alert("Error reading file: " + err.message);
+        document.body.dataset.view = 'upload';
+      }
+    });
+  });
+</script>
 </body>
   </html>
