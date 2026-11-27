@@ -688,70 +688,77 @@
 
 <script>
   // ================================================================
-  // AI-CA Assistant — Phase 2 & 3: File Upload, Parsing & Cleaning
+  // AI-CA Assistant — Phase 3: Complete Data Cleaning & Download
   // ================================================================
   
+  // Global variables (taki tabs click karne par data yaad rahe)
+  let rawDataGlobal = [];
+  let cleanedDataGlobal = [];
+  let headersGlobal = [];
+  let originalFileName = "";
+
   const fileInput = document.getElementById('file-input');
 
   fileInput.addEventListener('change', function(event) {
     const file = event.target.files[0];
     if (!file) return;
+    
+    originalFileName = file.name;
 
-    // 1. Screen change karo (Upload -> Parsing)
+    // Screen change karo
     document.body.dataset.view = 'parsing';
     document.getElementById('parsing-filename').textContent = file.name;
 
-    // 2. PapaParse library se file read karo
+    // File Parse Karo
     Papa.parse(file, {
       header: true, 
-      skipEmptyLines: false, // Hum khud empty rows handle karenge
+      skipEmptyLines: false,
       complete: function(results) {
         
-        // Asli Data mil gaya
-        let rawData = results.data;
-        let totalRows = rawData.length;
+        rawDataGlobal = results.data;
+        headersGlobal = results.meta.fields || [];
+        let totalRows = rawDataGlobal.length;
         
         let cleanedData = [];
         let seenRows = new Set();
         let duplicatesRemoved = 0;
         let emptyRowsRemoved = 0;
 
-        // 3. DATA CLEANING LOGIC (Khaali aur Duplicate rows hatana)
-        rawData.forEach(function(row) {
-          // Check karo row khaali hai ya nahi
+        // Cleaning Logic
+        rawDataGlobal.forEach(function(row) {
           let rowValues = Object.values(row);
           let isEmpty = rowValues.every(val => val === null || val === undefined || val.toString().trim() === '');
           
           if (isEmpty) {
             emptyRowsRemoved++;
-            return; // Khaali row ko skip karo
+            return;
           }
 
-          // Check karo duplicate hai ya nahi
           let rowString = JSON.stringify(row);
           if (seenRows.has(rowString)) {
             duplicatesRemoved++;
-            return; // Duplicate ko skip karo
+            return;
           }
 
-          // Agar sahi row hai, toh add karo
           seenRows.add(rowString);
           cleanedData.push(row);
         });
 
-        // 4. UI Update karo (Summary Cards me numbers daalo)
+        // Data ko global me save karo tabs ke liye
+        cleanedDataGlobal = cleanedData;
+
+        // UI Update karo
         document.getElementById('stat-total').textContent = totalRows;
         document.getElementById('stat-duplicates').textContent = duplicatesRemoved;
         document.getElementById('stat-empty').textContent = emptyRowsRemoved;
         document.getElementById('stat-cleaned').textContent = cleanedData.length;
         document.getElementById('filename-badge').textContent = file.name;
 
-        // 5. Result Screen par jao
-        document.body.dataset.view = 'results';
+        // Default: Messy Data dikhao
+        renderTable(headersGlobal, rawDataGlobal);
         
-        console.log("Cleaning Done!", {
-          totalRows, duplicatesRemoved, emptyRowsRemoved, cleanedRows: cleanedData.length
-        });
+        // Result Screen par jao
+        document.body.dataset.view = 'results';
       },
       error: function(err) {
         alert("Error reading file: " + err.message);
@@ -760,9 +767,86 @@
     });
   });
 
-  // "Clean Another" button ka logic (Wapas home screen pe jane ke liye)
+  // ==========================================
+  // TABLE RENDER KARNE KA FUNCTION
+  // ==========================================
+  function renderTable(headers, data) {
+    const thead = document.getElementById('preview-thead');
+    const tbody = document.getElementById('preview-tbody');
+    const caption = document.getElementById('table-caption');
+    
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+    
+    if (!headers || headers.length === 0) return;
+
+    // Headers banao
+    let trHead = document.createElement('tr');
+    headers.forEach(h => {
+      let th = document.createElement('th');
+      th.textContent = h || "Empty Column";
+      trHead.appendChild(th);
+    });
+    thead.appendChild(trHead);
+
+    // Max 100 rows dikhao
+    const displayData = data.slice(0, 100);
+    displayData.forEach(row => {
+      let tr = document.createElement('tr');
+      headers.forEach(h => {
+        let td = document.createElement('td');
+        td.textContent = row[h] || ''; // Safe text insertion
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+
+    caption.textContent = `Showing first ${Math.min(100, data.length)} of ${data.length} rows`;
+  }
+
+  // ==========================================
+  // TAB SWITCHING LOGIC
+  // ==========================================
+  document.getElementById('tab-messy').addEventListener('click', function() {
+    this.classList.add('active');
+    document.getElementById('tab-cleaned').classList.remove('active');
+    renderTable(headersGlobal, rawDataGlobal);
+  });
+
+  document.getElementById('tab-cleaned').addEventListener('click', function() {
+    this.classList.add('active');
+    document.getElementById('tab-messy').classList.remove('active');
+    renderTable(headersGlobal, cleanedDataGlobal);
+  });
+
+  // ==========================================
+  // DOWNLOAD CSV LOGIC
+  // ==========================================
+  document.getElementById('download-btn').addEventListener('click', function() {
+    if (cleanedDataGlobal.length === 0) return;
+
+    // PapaParse se wapas CSV string banao
+    const csv = Papa.unparse(cleanedDataGlobal);
+    
+    // Blob banao aur download trigger karo
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    // File ka naam set karo (originalname_cleaned.csv)
+    let cleanName = originalFileName.replace('.csv', '') + '_cleaned.csv';
+    a.download = cleanName;
+    
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // "Clean Another" button
   document.getElementById('clean-another-btn').addEventListener('click', function() {
-    fileInput.value = ''; // Input clear karo
+    fileInput.value = ''; 
     document.body.dataset.view = 'upload';
   });
 </script>
