@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="AI-CA Assistant — clean messy client CSVs in seconds. 100% on-device, private, CA-ready." />
+  <meta name="theme-color" content="#1E3A8A" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self';" />
+
+  <title>AI-CA Assistant — Clean Client CSVs in Seconds</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============ DESIGN TOKENS ============ */
+    :root {
+      --color-primary: #1E3A8A;
+      --color-primary-hover: #1E40AF;
+      --color-primary-soft: #EFF6FF;
+      --color-success: #10B981;
+      --color-success-soft: #ECFDF5;
+      --color-warning: #F59E0B;
+      --color-warning-soft: #FFFBEB;
+      --color-error: #EF4444;
+      --color-error-soft: #FEF2F2;
+      --color-bg: #F8FAFC;
+      --color-surface: #FFFFFF;
+      --color-border: #E2E8F0;
+      --color-text-primary: #0F172A;
+      --color-text-secondary: #64748B;
+      --color-text-inverse: #FFFFFF;
+
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+
+      --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+      --shadow-lg: 0 4px 6px rgba(15, 23, 42, 0.05), 0 10px 20px rgba(15, 23, 42, 0.08);
+
+      --font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-6: 24px;
+      --space-8: 32px;
+      --space-12: 48px;
+    }
+
+    /* ============ RESET ============ */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-family);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      line-height: 1.5;
+      font-size: 15px;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    button { font-family: inherit; cursor: pointer; }
+    :focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    /* ============ SCREEN SWITCHING ============ */
+    .screen { display: none; }
+    body[data-view="upload"] [data-screen="upload"],
+    body[data-view="parsing"] [data-screen="parsing"],
+    body[data-view="results"] [data-screen="results"],
+    body[data-view="error"] [data-screen="error"] { display: block; }
+
+    /* ============ LAYOUT WRAPPER ============ */
+    .screen {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: var(--space-4) var(--space-4) var(--space-8);
+    }
+
+    /* ============ TYPOGRAPHY ============ */
+    h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; margin: 0; }
+    h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+    p { margin: 0; }
+    @media (min-width: 640px) {
+      h1 { font-size: 32px; }
+      h2 { font-size: 22px; }
+    }
+
+    /* ============ TOP BAR ============ */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-2) 0 var(--space-6);
+      gap: var(--space-2);
+    }
+    .wordmark {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--color-text-primary);
+      letter-spacing: -0.01em;
+    }
+    .wordmark-icon {
+      width: 28px; height: 28px;
+      background: var(--color-primary);
+      color: var(--color-text-inverse);
+      border-radius: 8px;
+      display: grid; place-items: center;
+      font-size: 12px; font-weight: 700;
+    }
+
+    /* ============ UPLOAD (S1) ============ */
+    .upload-hero { margin-bottom: var(--space-6); }
+    .upload-hero h1 { margin-bottom: var(--space-2); }
+    .upload-hero .subtext {
+      color: var(--color-text-secondary);
+      font-size: 15px;
+      margin-bottom: var(--space-4);
+    }
+
+    .trust-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      background: var(--color-success-soft);
+      color: #047857;
+      border: 1px solid #A7F3D0;
+      padding: var(--space-2) var(--space-3);
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.3;
+    }
+    .trust-badge svg { flex-shrink: 0; }
+
+    .drop-zone {
+      display: block;
+      border: 2px dashed var(--color-border);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface);
+      padding: var(--space-8) var(--space-4);
+      text-align: center;
+      transition: border-color 150ms ease, background 150ms ease;
+      cursor: pointer;
+      margin-bottom: var(--space-4);
+    }
+    .drop-zone:hover,
+    .drop-zone:focus-visible,
+    .drop-zone.dragover {
+      border-color: var(--color-primary);
+      background: var(--color-primary-soft);
+    }
+    .drop-zone-icon {
+      width: 48px; height: 48px;
+      margin: 0 auto var(--space-3);
+      color: var(--color-primary);
+    }
+    .drop-zone-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-1);
+    }
+    .drop-zone-sub {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-2);
+    }
+    .drop-zone-meta {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+    }
+
+    .how-it-works {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-3);
+      margin-top: var(--space-8);
+      padding-top: var(--space-6);
+      border-top: 1px solid var(--color-border);
+    }
+    .step {
+      text-align: center;
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      line-height: 1.4;
+    }
+    .step-num {
+      display: inline-grid;
+      place-items: center;
+      width: 24px; height: 24px;
+      background: var(--color-primary-soft);
+      color: var(--color-primary);
+      border-radius: 50%;
+      font-weight: 600;
+      font-size: 12px;
+      margin-bottom: var(--space-2);
+    }
+    .step-label {
+      font-weight: 600;
+      color: var(--color-text-primary);
+      margin-bottom: 2px;
+    }
+
+    /* ============ BUTTONS ============ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 12px 20px;
+      font-size: 15px;
+      font-weight: 600;
+      min-height: 44px;
+      transition: background 150ms ease, transform 100ms ease;
+      text-decoration: none;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary {
+      background: var(--color-primary);
+      color: var(--color-text-inverse);
+    }
+    .btn-primary:hover { background: var(--color-primary-hover); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--color-text-secondary);
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+    .btn-ghost:hover {
+      background: var(--color-primary-soft);
+      color: var(--color-primary);
+    }
+    .btn-block { width: 100%; }
+
+    /* ============ PARSING (S2) ============ */
+    body[data-view="parsing"] [data-screen="parsing"] {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .parsing-container {
+      text-align: center;
+      max-width: 320px;
+      width: 100%;
+    }
+    .spinner {
+      width: 44px; height: 44px;
+      border: 3px solid var(--color-primary-soft);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto var(--space-6);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .parsing-filename {
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-1);
+      word-break: break-all;
+    }
+    .parsing-status {
+      color: var(--color-text-secondary);
+      font-size: 14px;
+    }
+    .parsing-progress {
+      color: var(--color-text-secondary);
+      font-size: 12px;
+      margin-top: var(--space-3);
+      min-height: 1em;
+    }
+
+    /* ============ RESULTS (S3) ============ */
+    .top-bar-results { padding: var(--space-2) 0 var(--space-4); }
+    .filename-badge {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 160px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+    @media (min-width: 640px) {
+      .summary-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+    .summary-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      box-shadow: var(--shadow-card);
+    }
+    .summary-card.cleaned {
+      background: var(--color-success-soft);
+      border-color: #A7F3D0;
+    }
+    .summary-card.cleaned .summary-value { color: #047857; }
+    .summary-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-1);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .summary-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--color-text-primary);
+      letter-spacing: -0.01em;
+      line-height: 1.1;
+    }
+    @media (min-width: 640px) {
+      .summary-value { font-size: 34px; }
+    }
+
+    .warning-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-2);
+      background: var(--color-warning-soft);
+      border: 1px solid #FDE68A;
+      color: #92400E;
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      margin-bottom: var(--space-4);
+      line-height: 1.4;
+    }
+    .warning-banner svg { flex-shrink: 0; margin-top: 1px; }
+    .warning-banner[hidden] { display: none; }
+
+    .tabs {
+      display: flex;
+      gap: var(--space-1);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: 4px;
+      margin-bottom: var(--space-4);
+    }
+    .tab {
+      flex: 1;
+      border: none;
+      background: transparent;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      border-radius: var(--radius-sm);
+      min-height: 40px;
+      transition: background 150ms ease, color 150ms ease;
+    }
+    .tab.active {
+      background: var(--color-primary-soft);
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+    .tab:hover:not(.active) { background: var(--color-bg); }
+
+    .table-wrapper {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+      margin-bottom: var(--space-2);
+      -webkit-overflow-scrolling: touch;
+    }
+    .preview-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 100%;
+    }
+    .preview-table th,
+    .preview-table td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--color-border);
+      white-space: nowrap;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .preview-table th {
+      background: var(--color-bg);
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .preview-table tr:last-child td { border-bottom: none; }
+
+    .table-caption {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      text-align: center;
+      margin-bottom: var(--space-6);
+    }
+
+    .sticky-bar {
+      position: sticky;
+      bottom: 0;
+      background: linear-gradient(to top, var(--color-bg) 70%, rgba(248, 250, 252, 0.6));
+      padding: var(--space-4) 0 var(--space-2);
+      padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+      margin-top: var(--space-2);
+    }
+
+    /* ============ ERROR (S4) ============ */
+    body[data-view="error"] [data-screen="error"] {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .error-card {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      border-left: 4px solid var(--color-error);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-lg);
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+    .error-icon {
+      width: 48px; height: 48px;
+      color: var(--color-error);
+      margin: 0 auto var(--space-4);
+      display: block;
+    }
+    .error-title { margin-bottom: var(--space-2); }
+    .error-message {
+      color: var(--color-text-secondary);
+      font-size: 14px;
+      margin-bottom: var(--space-4);
+    }
+    .error-details {
+      text-align: left;
+      margin-bottom: var(--space-4);
+      font-size: 12px;
+    }
+    .error-details summary {
+      cursor: pointer;
+      color: var(--color-text-secondary);
+      padding: var(--space-2) 0;
+      font-weight: 500;
+    }
+    .error-details pre {
+      background: var(--color-bg);
+      padding: var(--space-2);
+      border-radius: var(--radius-sm);
+      overflow-x: auto;
+      font-size: 11px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin: 0;
+    }
+
+    /* ============ TOASTS ============ */
+    .toast-container {
+      position: fixed;
+      top: var(--space-4);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      pointer-events: none;
+      width: calc(100% - 32px);
+      max-width: 400px;
+    }
+    .toast {
+      background: var(--color-text-primary);
+      color: var(--color-text-inverse);
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: var(--shadow-lg);
+      animation: toast-in 200ms ease-out;
+      pointer-events: auto;
+    }
+    .toast.success { background: var(--color-success); }
+    .toast.error { background: var(--color-error); }
+    .toast.warning { background: var(--color-warning); }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ============ REDUCED MOTION ============ */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+
+<body data-view="upload">
+
+  <div id="toast-container" class="toast-container" role="status" aria-live="polite"></div>
+
+  <!-- ============ S1: UPLOAD ============ -->
+  <main class="screen" data-screen="upload">
+    <header class="top-bar">
+      <div class="wordmark">
+        <span class="wordmark-icon" aria-hidden="true">CA</span>
+        <span>AI-CA Assistant</span>
+      </div>
+    </header>
+
+    <section class="upload-hero">
+      <h1>Clean messy client CSVs in seconds.</h1>
+      <p class="subtext">Duplicates, blanks, and formatting — fixed automatically. CA-ready output.</p>
+      <div class="trust-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <span>100% on-device — your data never leaves your phone</span>
+      </div>
+    </section>
+
+    <label class="drop-zone" id="drop-zone" for="file-input" tabindex="0">
+      <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <div class="drop-zone-title">Tap to upload CSV</div>
+      <div class="drop-zone-sub">or drag &amp; drop your file here</div>
+      <div class="drop-zone-meta">Max 10 MB · .csv only</div>
+    </label>
+    <input type="file" id="file-input" accept=".csv,text/csv,text/plain" hidden />
+
+    <button type="button" class="btn btn-primary btn-block" id="choose-file-btn">
+      Choose CSV File
+    </button>
+
+    <section class="how-it-works" aria-label="How it works">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-label">Upload</div>
+        <div>Your messy CSV</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-label">Clean</div>
+        <div>Auto-fix in seconds</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-label">Download</div>
+        <div>CA-ready output</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ S2: PARSING ============ -->
+  <main class="screen" data-screen="parsing" aria-live="polite">
+    <div class="parsing-container">
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="parsing-filename" id="parsing-filename">client_file.csv</p>
+      <p class="parsing-status">Reading &amp; cleaning your file…</p>
+      <p class="parsing-progress" id="parsing-progress"></p>
+    </div>
+  </main>
+
+  <!-- ============ S3: RESULTS ============ -->
+  <main class="screen" data-screen="results">
+    <header class="top-bar top-bar-results">
+      <button type="button" class="btn btn-ghost" id="clean-another-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        Clean Another
+      </button>
+      <span class="filename-badge" id="filename-badge">client_file.csv</span>
+    </header>
+
+    <section class="summary-grid" aria-label="Cleaning summary">
+      <div class="summary-card">
+        <div class="summary-label">Total Rows</div>
+        <div class="summary-value" id="stat-total">1,240</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Duplicates</div>
+        <div class="summary-value" id="stat-duplicates">87</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Empty Rows</div>
+        <div class="summary-value" id="stat-empty">12</div>
+      </div>
+      <div class="summary-card cleaned">
+        <div class="summary-label">Cleaned</div>
+        <div class="summary-value" id="stat-cleaned">1,141</div>
+      </div>
+    </section>
+
+    <div class="warning-banner" id="warning-banner" hidden>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <span id="warning-text">Some cells have invalid formatting and were flagged.</span>
+    </div>
+
+    <nav class="tabs" role="tablist" aria-label="Preview mode">
+      <button type="button" class="tab active" id="tab-messy" role="tab" aria-selected="true">Messy Data</button>
+      <button type="button" class="tab" id="tab-cleaned" role="tab" aria-selected="false">Cleaned Data</button>
+    </nav>
+
+    <div class="table-wrapper">
+      <table class="preview-table" id="preview-table">
+        <thead id="preview-thead"></thead>
+        <tbody id="preview-tbody">
+          <tr>
+            <td colspan="4" style="text-align:center;color:var(--color-text-secondary);padding:24px;">
+              Preview will appear here after upload.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-caption" id="table-caption">Showing first 100 rows</p>
+
+    <footer class="sticky-bar">
+      <button type="button" class="btn btn-primary btn-block" id="download-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Download Clean CSV
+      </button>
+    </footer>
+  </main>
+
+  <!-- ============ S4: ERROR ============ -->
+  <main class="screen" data-screen="error">
+    <div class="error-card" role="alert">
+      <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <h2 class="error-title">Something went wrong</h2>
+      <p class="error-message" id="error-message">We couldn't process your file. Please try again.</p>
+      <details class="error-details">
+        <summary>Technical details</summary>
+        <pre id="error-detail">No details available.</pre>
+      </details>
+      <button type="button" class="btn btn-primary btn-block" id="retry-btn">Try Again</button>
+    </div>
+  </main>
+
+  <script>
+    // ================================================================
+    // AI-CA Assistant — Phase 1 (UI Shell Only)
+    // ================================================================
+    console.log('[AI-CA] UI shell loaded. Set document.body.dataset.view to preview screens.');
+  </script>
+
+</body>
+  </html>
