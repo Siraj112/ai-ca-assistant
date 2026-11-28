@@ -688,10 +688,9 @@
 
 <script>
   // ================================================================
-  // AI-CA Assistant — Phase 3: Complete Data Cleaning & Download
+  // AI-CA Assistant — Phase 4A: Smart Data Cleaning & Validation
   // ================================================================
   
-  // Global variables (taki tabs click karne par data yaad rahe)
   let rawDataGlobal = [];
   let cleanedDataGlobal = [];
   let headersGlobal = [];
@@ -699,17 +698,20 @@
 
   const fileInput = document.getElementById('file-input');
 
+  // Regex (Format check karne ke rules)
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phoneRegex = /^[0-9]{10}$/; // 10 digit check
+  const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
   fileInput.addEventListener('change', function(event) {
     const file = event.target.files[0];
     if (!file) return;
     
     originalFileName = file.name;
 
-    // Screen change karo
     document.body.dataset.view = 'parsing';
     document.getElementById('parsing-filename').textContent = file.name;
 
-    // File Parse Karo
     Papa.parse(file, {
       header: true, 
       skipEmptyLines: false,
@@ -723,8 +725,8 @@
         let seenRows = new Set();
         let duplicatesRemoved = 0;
         let emptyRowsRemoved = 0;
+        let invalidCellsCount = 0; // Nayi warning ke liye
 
-        // Cleaning Logic
         rawDataGlobal.forEach(function(row) {
           let rowValues = Object.values(row);
           let isEmpty = rowValues.every(val => val === null || val === undefined || val.toString().trim() === '');
@@ -733,6 +735,34 @@
             emptyRowsRemoved++;
             return;
           }
+
+          // Formatting aur Validation Logic
+          headersGlobal.forEach(h => {
+            let val = row[h];
+            if (val !== null && val !== undefined && val.toString().trim() !== '') {
+              let strVal = val.toString().trim();
+              let headerLower = h.toLowerCase();
+
+              // Email Format
+              if (headerLower.includes('email')) {
+                strVal = strVal.toLowerCase();
+                if (!emailRegex.test(strVal)) invalidCellsCount++;
+              }
+              // Phone Format
+              else if (headerLower.includes('phone') || headerLower.includes('mobile') || headerLower.includes('contact')) {
+                strVal = strVal.replace(/[\s\-\(\)]/g, ''); // spaces aur dash hatao
+                if (strVal.length === 12 && strVal.startsWith('91')) strVal = strVal.substring(2); // +91 hatao
+                if (!phoneRegex.test(strVal)) invalidCellsCount++;
+              }
+              // GSTIN Format
+              else if (headerLower.includes('gst') || headerLower.includes('gstin')) {
+                strVal = strVal.toUpperCase();
+                if (strVal.length === 15 && !gstRegex.test(strVal)) invalidCellsCount++;
+              }
+
+              row[h] = strVal; // Updated value wapas row me daalo
+            }
+          });
 
           let rowString = JSON.stringify(row);
           if (seenRows.has(rowString)) {
@@ -744,20 +774,24 @@
           cleanedData.push(row);
         });
 
-        // Data ko global me save karo tabs ke liye
         cleanedDataGlobal = cleanedData;
 
-        // UI Update karo
+        // UI Update
         document.getElementById('stat-total').textContent = totalRows;
         document.getElementById('stat-duplicates').textContent = duplicatesRemoved;
         document.getElementById('stat-empty').textContent = emptyRowsRemoved;
         document.getElementById('stat-cleaned').textContent = cleanedData.length;
         document.getElementById('filename-badge').textContent = file.name;
 
-        // Default: Messy Data dikhao
+        // Smart Warning Banner dikhao agar koi galat format mila
+        if (invalidCellsCount > 0) {
+          document.getElementById('warning-text').textContent = `${invalidCellsCount} cells have invalid formatting (Email/Phone/GST) and were flagged.`;
+          document.getElementById('warning-banner').hidden = false;
+        } else {
+          document.getElementById('warning-banner').hidden = true;
+        }
+
         renderTable(headersGlobal, rawDataGlobal);
-        
-        // Result Screen par jao
         document.body.dataset.view = 'results';
       },
       error: function(err) {
@@ -767,9 +801,6 @@
     });
   });
 
-  // ==========================================
-  // TABLE RENDER KARNE KA FUNCTION
-  // ==========================================
   function renderTable(headers, data) {
     const thead = document.getElementById('preview-thead');
     const tbody = document.getElementById('preview-tbody');
@@ -780,7 +811,6 @@
     
     if (!headers || headers.length === 0) return;
 
-    // Headers banao
     let trHead = document.createElement('tr');
     headers.forEach(h => {
       let th = document.createElement('th');
@@ -789,13 +819,12 @@
     });
     thead.appendChild(trHead);
 
-    // Max 100 rows dikhao
     const displayData = data.slice(0, 100);
     displayData.forEach(row => {
       let tr = document.createElement('tr');
       headers.forEach(h => {
         let td = document.createElement('td');
-        td.textContent = row[h] || ''; // Safe text insertion
+        td.textContent = row[h] || ''; 
         tr.appendChild(td);
       });
       tbody.appendChild(tr);
@@ -804,9 +833,6 @@
     caption.textContent = `Showing first ${Math.min(100, data.length)} of ${data.length} rows`;
   }
 
-  // ==========================================
-  // TAB SWITCHING LOGIC
-  // ==========================================
   document.getElementById('tab-messy').addEventListener('click', function() {
     this.classList.add('active');
     document.getElementById('tab-cleaned').classList.remove('active');
@@ -819,32 +845,21 @@
     renderTable(headersGlobal, cleanedDataGlobal);
   });
 
-  // ==========================================
-  // DOWNLOAD CSV LOGIC
-  // ==========================================
   document.getElementById('download-btn').addEventListener('click', function() {
     if (cleanedDataGlobal.length === 0) return;
-
-    // PapaParse se wapas CSV string banao
     const csv = Papa.unparse(cleanedDataGlobal);
-    
-    // Blob banao aur download trigger karo
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    
-    // File ka naam set karo (originalname_cleaned.csv)
     let cleanName = originalFileName.replace('.csv', '') + '_cleaned.csv';
     a.download = cleanName;
-    
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   });
 
-  // "Clean Another" button
   document.getElementById('clean-another-btn').addEventListener('click', function() {
     fileInput.value = ''; 
     document.body.dataset.view = 'upload';
