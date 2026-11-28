@@ -12,6 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  
   <!-- PapaParse: CSV File Padhne Ka Engine -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
@@ -279,12 +280,6 @@
       color: var(--color-text-secondary);
       font-size: 14px;
     }
-    .parsing-progress {
-      color: var(--color-text-secondary);
-      font-size: 12px;
-      margin-top: var(--space-3);
-      min-height: 1em;
-    }
 
     /* ============ RESULTS (S3) ============ */
     .top-bar-results { padding: var(--space-2) 0 var(--space-4); }
@@ -336,9 +331,6 @@
       color: var(--color-text-primary);
       letter-spacing: -0.01em;
       line-height: 1.1;
-    }
-    @media (min-width: 640px) {
-      .summary-value { font-size: 34px; }
     }
 
     .warning-banner {
@@ -419,7 +411,7 @@
     }
     .preview-table tr:last-child td { border-bottom: none; }
 
-    /* 🔥 NAYA: RED HIGHLIGHTING LOGIC 🔥 */
+    /* 🔥 RED HIGHLIGHTING LOGIC 🔥 */
     .invalid-cell {
       background-color: #FEE2E2 !important;
       color: #B91C1C !important;
@@ -441,36 +433,6 @@
       padding: var(--space-4) 0 var(--space-2);
       padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
       margin-top: var(--space-2);
-    }
-
-    /* ============ ERROR (S4) ============ */
-    body[data-view="error"] [data-screen="error"] {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-    }
-    .error-card {
-      background: var(--color-surface);
-      border-radius: var(--radius-lg);
-      border-left: 4px solid var(--color-error);
-      padding: var(--space-6);
-      box-shadow: var(--shadow-lg);
-      max-width: 420px;
-      width: 100%;
-      text-align: center;
-    }
-    .error-icon {
-      width: 48px; height: 48px;
-      color: var(--color-error);
-      margin: 0 auto var(--space-4);
-      display: block;
-    }
-    .error-title { margin-bottom: var(--space-2); }
-    .error-message {
-      color: var(--color-text-secondary);
-      font-size: 14px;
-      margin-bottom: var(--space-4);
     }
 
     /* ============ REDUCED MOTION ============ */
@@ -599,7 +561,7 @@
 
   <script>
     // ================================================================
-    // AI-CA Assistant — Phase 5: Smart UI & Red Highlighting
+    // AI-CA Assistant — Phase 5B (Fixed): Smart Dates & PAN Validation
     // ================================================================
     
     let rawDataGlobal = [];
@@ -609,10 +571,27 @@
 
     const fileInput = document.getElementById('file-input');
 
-    // Regex
+    // Validation Regex
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^[0-9]{10}$/;
     const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+
+    function standardizeDate(dateStr) {
+      if (!dateStr) return null;
+      let cleanDate = dateStr.toString().trim().replace(/[\/\.\s]/g, '-');
+      let parts = cleanDate.split('-');
+      
+      if (parts.length === 3) {
+        if (parts[0].length === 4) { // YYYY-MM-DD
+          return `${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[0]}`;
+        } else if (parts[2].length >= 2) { // DD-MM-YYYY
+          let year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+          return `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${year}`;
+        }
+      }
+      return "Invalid Date";
+    }
 
     fileInput.addEventListener('change', function(event) {
       const file = event.target.files[0];
@@ -637,7 +616,6 @@
           let emptyRowsRemoved = 0;
           let invalidCellsCount = 0; 
 
-          // 1. CLEANING ENGINE
           rawDataGlobal.forEach(function(row) {
             let rowValues = Object.values(row);
             let isEmpty = rowValues.every(val => val === null || val === undefined || val.toString().trim() === '');
@@ -647,8 +625,8 @@
               return;
             }
 
-            // Formatting aur Validation
             headersGlobal.forEach(h => {
+              if (!h) return; // Safety check
               let val = row[h];
               if (val !== null && val !== undefined && val.toString().trim() !== '') {
                 let strVal = val.toString().trim();
@@ -667,7 +645,18 @@
                   strVal = strVal.toUpperCase();
                   if (strVal.length === 15 && !gstRegex.test(strVal)) invalidCellsCount++;
                 }
-
+                else if (headerLower.includes('pan')) {
+                  strVal = strVal.toUpperCase();
+                  if (!panRegex.test(strVal)) invalidCellsCount++;
+                }
+                else if (headerLower.includes('date') || headerLower.includes('dob')) {
+                  let formattedDate = standardizeDate(strVal);
+                  if (formattedDate === "Invalid Date") {
+                    invalidCellsCount++;
+                  } else {
+                    strVal = formattedDate;
+                  }
+                }
                 row[h] = strVal; 
               }
             });
@@ -683,7 +672,6 @@
 
           cleanedDataGlobal = cleanedData;
 
-          // 2. UI Update
           document.getElementById('stat-total').textContent = totalRows;
           document.getElementById('stat-duplicates').textContent = duplicatesRemoved;
           document.getElementById('stat-empty').textContent = emptyRowsRemoved;
@@ -691,7 +679,7 @@
           document.getElementById('filename-badge').textContent = file.name;
 
           if (invalidCellsCount > 0) {
-            document.getElementById('warning-text').textContent = `${invalidCellsCount} cells have invalid formatting and are highlighted in red.`;
+            document.getElementById('warning-text').textContent = `${invalidCellsCount} cells have invalid formatting and are flagged.`;
             document.getElementById('warning-banner').hidden = false;
           } else {
             document.getElementById('warning-banner').hidden = true;
@@ -707,243 +695,92 @@
       });
     });
 
-    // 3. RENDER TABLE WITH RED HIGHLIGHTS
     function renderTable(headers, data) {
       const thead = document.getElementById('preview-thead');
-<script>
-  // ================================================================
-  // AI-CA Assistant — Phase 5B: Smart Dates & PAN Validation
-  // ================================================================
-  
-  let rawDataGlobal = [];
-  let cleanedDataGlobal = [];
-  let headersGlobal = [];
-  let originalFileName = "";
+      const tbody = document.getElementById('preview-tbody');
+      const caption = document.getElementById('table-caption');
+      
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+      if (!headers || headers.length === 0) return;
 
-  const fileInput = document.getElementById('file-input');
-
-  // Validation Regex (Formats)
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const phoneRegex = /^[0-9]{10}$/;
-  const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-  const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-
-  // Smart Date Format Function (Sabhi dates ko DD-MM-YYYY banayega)
-  function standardizeDate(dateStr) {
-    if (!dateStr) return null;
-    let cleanDate = dateStr.toString().trim().replace(/[\/\.\s]/g, '-');
-    let parts = cleanDate.split('-');
-    
-    if (parts.length === 3) {
-      if (parts[0].length === 4) { // YYYY-MM-DD
-        return `${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[0]}`;
-      } else if (parts[2].length >= 2) { // DD-MM-YYYY
-        let year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
-        return `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${year}`;
-      }
-    }
-    return "Invalid Date"; // Agar format samajh na aaye
-  }
-
-  fileInput.addEventListener('change', function(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    originalFileName = file.name;
-
-    document.body.dataset.view = 'parsing';
-    document.getElementById('parsing-filename').textContent = file.name;
-
-    Papa.parse(file, {
-      header: true, 
-      skipEmptyLines: false,
-      complete: function(results) {
-        
-        rawDataGlobal = results.data;
-        headersGlobal = results.meta.fields || [];
-        let totalRows = rawDataGlobal.length;
-        
-        let cleanedData = [];
-        let seenRows = new Set();
-        let duplicatesRemoved = 0;
-        let emptyRowsRemoved = 0;
-        let invalidCellsCount = 0; 
-
-        // DATA CLEANING & VALIDATION ENGINE
-        rawDataGlobal.forEach(function(row) {
-          let rowValues = Object.values(row);
-          let isEmpty = rowValues.every(val => val === null || val === undefined || val.toString().trim() === '');
-          
-          if (isEmpty) {
-            emptyRowsRemoved++;
-            return;
-          }
-
-          headersGlobal.forEach(h => {
-            let val = row[h];
-            if (val !== null && val !== undefined && val.toString().trim() !== '') {
-              let strVal = val.toString().trim();
-              let headerLower = h.toLowerCase();
-
-              // 1. Email Logic
-              if (headerLower.includes('email')) {
-                strVal = strVal.toLowerCase();
-                if (!emailRegex.test(strVal)) invalidCellsCount++;
-              }
-              // 2. Phone Logic
-              else if (headerLower.includes('phone') || headerLower.includes('mobile') || headerLower.includes('contact')) {
-                strVal = strVal.replace(/[\s\-\(\)]/g, ''); 
-                if (strVal.length === 12 && strVal.startsWith('91')) strVal = strVal.substring(2); 
-                if (!phoneRegex.test(strVal)) invalidCellsCount++;
-              }
-              // 3. GST Logic
-              else if (headerLower.includes('gst') || headerLower.includes('gstin')) {
-                strVal = strVal.toUpperCase();
-                if (strVal.length === 15 && !gstRegex.test(strVal)) invalidCellsCount++;
-              }
-              // 4. PAN Logic (NAYA)
-              else if (headerLower.includes('pan')) {
-                strVal = strVal.toUpperCase();
-                if (!panRegex.test(strVal)) invalidCellsCount++;
-              }
-              // 5. Date Logic (NAYA)
-              else if (headerLower.includes('date') || headerLower.includes('dob')) {
-                let formattedDate = standardizeDate(strVal);
-                if (formattedDate === "Invalid Date") {
-                  invalidCellsCount++;
-                } else {
-                  strVal = formattedDate;
-                }
-              }
-
-              row[h] = strVal; 
-            }
-          });
-
-          let rowString = JSON.stringify(row);
-          if (seenRows.has(rowString)) {
-            duplicatesRemoved++;
-            return;
-          }
-          seenRows.add(rowString);
-          cleanedData.push(row);
-        });
-
-        cleanedDataGlobal = cleanedData;
-
-        // UI Update
-        document.getElementById('stat-total').textContent = totalRows;
-        document.getElementById('stat-duplicates').textContent = duplicatesRemoved;
-        document.getElementById('stat-empty').textContent = emptyRowsRemoved;
-        document.getElementById('stat-cleaned').textContent = cleanedData.length;
-        document.getElementById('filename-badge').textContent = file.name;
-
-        if (invalidCellsCount > 0) {
-          document.getElementById('warning-text').textContent = `${invalidCellsCount} cells have invalid formatting (Email/Phone/GST/PAN/Date) and are flagged.`;
-          document.getElementById('warning-banner').hidden = false;
-        } else {
-          document.getElementById('warning-banner').hidden = true;
-        }
-
-        renderTable(headersGlobal, rawDataGlobal);
-        document.body.dataset.view = 'results';
-      },
-      error: function(err) {
-        alert("Error reading file: " + err.message);
-        document.body.dataset.view = 'upload';
-      }
-    });
-  });
-
-  // RENDER TABLE WITH RED HIGHLIGHTS
-  function renderTable(headers, data) {
-    const thead = document.getElementById('preview-thead');
-    const tbody = document.getElementById('preview-tbody');
-    const caption = document.getElementById('table-caption');
-    
-    thead.innerHTML = '';
-    tbody.innerHTML = '';
-    if (!headers || headers.length === 0) return;
-
-    let trHead = document.createElement('tr');
-    headers.forEach(h => {
-      let th = document.createElement('th');
-      th.textContent = h || "Empty";
-      trHead.appendChild(th);
-    });
-    thead.appendChild(trHead);
-
-    const displayData = data.slice(0, 100);
-    displayData.forEach(row => {
-      let tr = document.createElement('tr');
+      let trHead = document.createElement('tr');
       headers.forEach(h => {
-        let td = document.createElement('td');
-        let val = row[h] ? row[h].toString().trim() : '';
-        td.textContent = val; 
-        
-        let headerLower = h.toLowerCase();
-        
-        // Highlight Logic
-        if (headerLower.includes('email') && val !== '') {
-          if (!emailRegex.test(val)) td.classList.add('invalid-cell');
-        } 
-        else if ((headerLower.includes('phone') || headerLower.includes('mobile')) && val !== '') {
-           let cleanPhone = val.replace(/[\s\-\(\)]/g, '');
-           if (cleanPhone.length === 12 && cleanPhone.startsWith('91')) cleanPhone = cleanPhone.substring(2);
-           if (!phoneRegex.test(cleanPhone)) td.classList.add('invalid-cell');
-        }
-        else if ((headerLower.includes('gst') || headerLower.includes('gstin')) && val !== '') {
-           if (val.length === 15 && !gstRegex.test(val)) td.classList.add('invalid-cell');
-        }
-        else if (headerLower.includes('pan') && val !== '') {
-           if (!panRegex.test(val)) td.classList.add('invalid-cell');
-        }
-        else if ((headerLower.includes('date') || headerLower.includes('dob')) && val !== '') {
-           if (val === "Invalid Date" || !val.match(/^\d{2}-\d{2}-\d{4}$/)) {
-             td.classList.add('invalid-cell');
-           }
-        }
-
-        tr.appendChild(td);
+        let th = document.createElement('th');
+        th.textContent = h || "Empty";
+        trHead.appendChild(th);
       });
-      tbody.appendChild(tr);
+      thead.appendChild(trHead);
+
+      const displayData = data.slice(0, 100);
+      displayData.forEach(row => {
+        let tr = document.createElement('tr');
+        headers.forEach(h => {
+          if (!h) return;
+          let td = document.createElement('td');
+          let val = row[h] ? row[h].toString().trim() : '';
+          td.textContent = val; 
+          
+          let headerLower = h.toLowerCase();
+          
+          if (headerLower.includes('email') && val !== '') {
+            if (!emailRegex.test(val)) td.classList.add('invalid-cell');
+          } 
+          else if ((headerLower.includes('phone') || headerLower.includes('mobile')) && val !== '') {
+             let cleanPhone = val.replace(/[\s\-\(\)]/g, '');
+             if (cleanPhone.length === 12 && cleanPhone.startsWith('91')) cleanPhone = cleanPhone.substring(2);
+             if (!phoneRegex.test(cleanPhone)) td.classList.add('invalid-cell');
+          }
+          else if ((headerLower.includes('gst') || headerLower.includes('gstin')) && val !== '') {
+             if (val.length === 15 && !gstRegex.test(val)) td.classList.add('invalid-cell');
+          }
+          else if (headerLower.includes('pan') && val !== '') {
+             if (!panRegex.test(val)) td.classList.add('invalid-cell');
+          }
+          else if ((headerLower.includes('date') || headerLower.includes('dob')) && val !== '') {
+             if (val === "Invalid Date" || !val.match(/^\d{2}-\d{2}-\d{4}$/)) {
+               td.classList.add('invalid-cell');
+             }
+          }
+
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+
+      caption.textContent = `Showing first ${Math.min(100, data.length)} of ${data.length} rows`;
+    }
+
+    document.getElementById('tab-messy').addEventListener('click', function() {
+      this.classList.add('active');
+      document.getElementById('tab-cleaned').classList.remove('active');
+      renderTable(headersGlobal, rawDataGlobal);
     });
 
-    caption.textContent = `Showing first ${Math.min(100, data.length)} of ${data.length} rows`;
-  }
+    document.getElementById('tab-cleaned').addEventListener('click', function() {
+      this.classList.add('active');
+      document.getElementById('tab-messy').classList.remove('active');
+      renderTable(headersGlobal, cleanedDataGlobal);
+    });
 
-  // Tabs Switching
-  document.getElementById('tab-messy').addEventListener('click', function() {
-    this.classList.add('active');
-    document.getElementById('tab-cleaned').classList.remove('active');
-    renderTable(headersGlobal, rawDataGlobal);
-  });
+    document.getElementById('download-btn').addEventListener('click', function() {
+      if (cleanedDataGlobal.length === 0) return;
+      const csv = Papa.unparse(cleanedDataGlobal);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = originalFileName.replace('.csv', '') + '_cleaned.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
 
-  document.getElementById('tab-cleaned').addEventListener('click', function() {
-    this.classList.add('active');
-    document.getElementById('tab-messy').classList.remove('active');
-    renderTable(headersGlobal, cleanedDataGlobal);
-  });
-
-  // Download CSV
-  document.getElementById('download-btn').addEventListener('click', function() {
-    if (cleanedDataGlobal.length === 0) return;
-    const csv = Papa.unparse(cleanedDataGlobal);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = originalFileName.replace('.csv', '') + '_cleaned.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  });
-
-  // Clean Another
-  document.getElementById('clean-another-btn').addEventListener('click', function() {
-    fileInput.value = ''; 
-    document.body.dataset.view = 'upload';
-  });
-</script>
+    document.getElementById('clean-another-btn').addEventListener('click', function() {
+      fileInput.value = ''; 
+      document.body.dataset.view = 'upload';
+    });
+  </script>
 </body>
 </html>
